@@ -45,22 +45,6 @@ jobs:
     - name: 签出工作区
       uses: actions/checkout@main
 
-    - name: Free Disk Space (Ubuntu)
-      uses: jlumbroso/free-disk-space@main
-      with:
-        # this might remove tools that are actually needed,
-        # if set to "true" but frees about 6 GB
-        tool-cache: false
-        
-        # all of these default to true, but feel free to set to
-        # "false" if necessary for your workflow
-        android: true
-        dotnet: true
-        haskell: true
-        large-packages: true
-        docker-images: true
-        swap-storage: true    
-
     - name: 初始化编译环境
       env:
         DEBIAN_FRONTEND: noninteractive
@@ -130,12 +114,6 @@ jobs:
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
-    - name: 检查编译产物
-      run: |
-        echo "Listing contents of firmware directory:"
-        ls -lhR openwrt/bin/targets/bcm53xx/generic/
-        # You might need to adjust 'bcm53xx/generic/' based on your actual target
-
     - name: 核对空间占用
       if: (!cancelled())
       run: df -hT
@@ -151,12 +129,9 @@ jobs:
       id: organize
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
-        # Ensure the directory exists and set FIRMWARE env var
-        # You might want to copy specific firmware files to a new temp dir here
-        # For now, let's just make sure FIRMWARE points to the correct location
         cd openwrt/bin/targets/*/*
-        # Removed 'rm -rf packages' for now to avoid accidental deletion
-        echo "FIRMWARE_DIR=$PWD" >> $GITHUB_ENV # Renamed to FIRMWARE_DIR to avoid conflict
+        rm -rf packages
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "STATUS=success" >> "$GITHUB_OUTPUT"
 
     - name: 上传固件目录
@@ -164,12 +139,7 @@ jobs:
       if: steps.organize.outputs.STATUS == 'success' && !cancelled()
       with:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        # Specify glob pattern to include only relevant firmware files
-        path: ${{ env.FIRMWARE_DIR }}/*.bin # Adjust *.bin if your files are *.img or another extension
-        # If there are multiple, you can do:
-        # path: |
-        #   ${{ env.FIRMWARE_DIR }}/*.bin
-        #   ${{ env.FIRMWARE_DIR }}/*.img
+        path: ${{ env.FIRMWARE }}
 
     - name: 生成Release标识
       id: tag
@@ -187,11 +157,7 @@ jobs:
       with:
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
-        # Pass the exact files or a glob pattern for the release attachment
-        files: |
-          ${{ env.FIRMWARE_DIR }}/*.bin # Again, adjust if your files are *.img or another extension
-          # If you want to attach the uploaded artifact directly, you'd need to download it first
-          # but usually, it's simpler to attach the original files.
+        files: ${{ env.FIRMWARE }}/*
 
     - name: 清理工作空间
       uses: GitRML/delete-workflow-runs@main
