@@ -173,7 +173,7 @@ jobs:
       with:
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
-        files: ${{ env.FIRMWARE }}/*
+        files: ${{ env.FIRMWARE }}
 
     - name: 清理工作空间
       uses: GitRML/delete-workflow-runs@main
