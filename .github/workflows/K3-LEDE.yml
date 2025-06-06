@@ -130,6 +130,12 @@ jobs:
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
+    - name: 检查编译产物
+      run: |
+        echo "Listing contents of firmware directory:"
+        ls -lhR openwrt/bin/targets/bcm53xx/generic/
+        # You might need to adjust 'bcm53xx/generic/' based on your actual target
+
     - name: 核对空间占用
       if: (!cancelled())
       run: df -hT
@@ -145,9 +151,12 @@ jobs:
       id: organize
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
+        # Ensure the directory exists and set FIRMWARE env var
+        # You might want to copy specific firmware files to a new temp dir here
+        # For now, let's just make sure FIRMWARE points to the correct location
         cd openwrt/bin/targets/*/*
-        rm -rf packages
-        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+        # Removed 'rm -rf packages' for now to avoid accidental deletion
+        echo "FIRMWARE_DIR=$PWD" >> $GITHUB_ENV # Renamed to FIRMWARE_DIR to avoid conflict
         echo "STATUS=success" >> "$GITHUB_OUTPUT"
 
     - name: 上传固件目录
@@ -155,7 +164,12 @@ jobs:
       if: steps.organize.outputs.STATUS == 'success' && !cancelled()
       with:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        path: ${{ env.FIRMWARE }}
+        # Specify glob pattern to include only relevant firmware files
+        path: ${{ env.FIRMWARE_DIR }}/*.bin # Adjust *.bin if your files are *.img or another extension
+        # If there are multiple, you can do:
+        # path: |
+        #   ${{ env.FIRMWARE_DIR }}/*.bin
+        #   ${{ env.FIRMWARE_DIR }}/*.img
 
     - name: 生成Release标识
       id: tag
@@ -173,7 +187,11 @@ jobs:
       with:
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
-        files: ${{ env.FIRMWARE }}
+        # Pass the exact files or a glob pattern for the release attachment
+        files: |
+          ${{ env.FIRMWARE_DIR }}/*.bin # Again, adjust if your files are *.img or another extension
+          # If you want to attach the uploaded artifact directly, you'd need to download it first
+          # but usually, it's simpler to attach the original files.
 
     - name: 清理工作空间
       uses: GitRML/delete-workflow-runs@main
